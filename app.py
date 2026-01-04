@@ -20,14 +20,8 @@ user_records = {}
 app = Flask(__name__)
 
 # ⚠️ 建議使用環境變數（本機 / 雲端皆可）
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv(
-    "LINE_CHANNEL_ACCESS_TOKEN",
-    "gVwzSkg4/dEKXNmXb7iVcnFxeaazzNFWCjYg66mDBMlBRAaBIuVHG1UJAMmuYK7kB1rg2odk1SwO9rMdWgOxCoUMCnv2BNCDM4lvhV+1gFPxz2kO6Ij51Jp+1gjrphApOqklpWhb3H6Yfi+a64dALQdB04t89/1O/w1cDnyilFU="
-)
-LINE_CHANNEL_SECRET = os.getenv(
-    "LINE_CHANNEL_SECRET",
-    "a99e75d60416489df322c539aa038f4e"
-)
+LINE_CHANNEL_ACCESS_TOKEN = os.environ["iEpxYFHcpO7OgBpD2zW/rN0ZkjKGtyQ3ILF9GUsHsvxWhKIC1dFAPZZPXaYoCm+WB1rg2odk1SwO9rMdWgOxCoUMCnv2BNCDM4lvhV+1gFObVYAK/unc4uqsd+0p0ycn1gHY0emgY8ge0q4GW3LD4QdB04t89/1O/w1cDnyilFU="]
+LINE_CHANNEL_SECRET = os.environ["256d5a2b375807389c34bc5c9b65cbb7"]
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
