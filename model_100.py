@@ -268,6 +268,18 @@ def get_model(device):
         _MODEL = model
     return _MODEL
 
+# =================================================
+# 對外 API：給 app.py 用
+# =================================================
+def load_model(device=None):
+    """
+    給 app.py 使用的模型載入介面
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return get_model(device)
+
+
 
 @torch.no_grad()
 def predict_food(image_bytes: bytes):
