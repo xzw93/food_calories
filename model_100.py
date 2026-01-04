@@ -258,18 +258,7 @@ inference_transform = transforms.Compose([
 # =================================================
 _MODEL = None
 
-def load_model(device=None):
-    """
-    提供給 app.py import 的正式介面
-    """
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return _get_model(device)
-
-
-def _get_model(device):
-    """
-    真正的 lazy loading 實作
-    """
+def get_model(device):
     global _MODEL
     if _MODEL is None:
         weight_path = Path(__file__).parent / "outputs_100" / "uec100_model.pth"
@@ -281,9 +270,9 @@ def _get_model(device):
 
 
 @torch.no_grad()
-def predict_food(image_bytes: bytes) -> Tuple[str, str, int, float]:
+def predict_food(image_bytes: bytes):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = _get_model(device)
+    model = get_model(device)
 
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     x = inference_transform(img).unsqueeze(0).to(device)

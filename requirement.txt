@@ -1,9 +1,0 @@
-flask
-line-bot-sdk
-torch
-torchvision
-pillow
-numpy
-pandas
-openpyxl
-scikit-learn

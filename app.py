@@ -186,8 +186,7 @@ def handle_image(event):
             message_content = line_bot_api.get_message_content(event.message.id)
             image_bytes = b"".join(message_content.iter_content())
 
-            model = get_model_once()
-            food_en, food_zh, food_idx, confidence = predict_food(image_bytes, model=model)
+            food_en, food_zh, food_idx, confidence = predict_food(image_bytes)
 
             calorie_text = get_calorie(food_zh)
             kcal_min, kcal_max = parse_kcal_range(calorie_text)
