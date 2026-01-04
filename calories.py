@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 from manual_calorie_estimator import manual_calorie_estimate
+import re
+from typing import Optional, Tuple
 
 # =================================================
 # 1. 讀取食品營養成分資料庫（2024 UPDATE2）
@@ -61,3 +63,25 @@ def get_calorie(food_zh: str) -> str:
         f"約 {est['kcal_min']}–{est['kcal_max']} kcal（每 100 g）\n"
         f"※ {est['source']}"
     )
+
+def parse_kcal_range(text: str) -> Tuple[Optional[int], Optional[int]]:
+    """
+    從 '約 249–321 kcal（每 100 g ...）' 抓出 (249, 321)
+    抓不到就回 (None, None)
+    """
+    if not text:
+        return None, None
+
+    # 支援 249–321 / 249-321 / 249~321
+    m = re.search(r"(\d+)\s*[–\-~]\s*(\d+)", text)
+    if m:
+        a, b = int(m.group(1)), int(m.group(2))
+        return (min(a, b), max(a, b))
+
+    # 只有單一數字：例如 '約 300 kcal（每 100 g）'
+    m2 = re.search(r"(\d+)\s*kcal", text, flags=re.IGNORECASE)
+    if m2:
+        v = int(m2.group(1))
+        return v, v
+
+    return None, None
