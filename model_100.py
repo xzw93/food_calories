@@ -205,6 +205,7 @@ class BasicBlock(nn.Module):
             identity = self.downsample(identity)
         return self.relu(out + identity)
 
+
 class FoodCNN(nn.Module):
     def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
