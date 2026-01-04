@@ -38,12 +38,17 @@ def callback():
     signature = request.headers.get("X-Line-Signature")
     body = request.get_data(as_text=True)
 
+    # ✅ LINE Verify Webhook 會沒有 signature
+    if signature is None:
+        return "OK", 200
+
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
 
-    return "OK"
+    return "OK", 200
+
 
 
 def parse_kcal_range(text: str) -> int | None:
