@@ -258,9 +258,10 @@ inference_transform = transforms.Compose([
 # =================================================
 _MODEL = None
 
-def get_model(device):
+def load_model(device=None):
     global _MODEL
     if _MODEL is None:
+        device = device or torch.device("cpu")  # Render 一律用 CPU
         weight_path = Path(__file__).parent / "outputs_100" / "uec100_model.pth"
         model = FoodCNN().to(device)
         model.load_state_dict(torch.load(weight_path, map_location=device))
@@ -268,26 +269,14 @@ def get_model(device):
         _MODEL = model
     return _MODEL
 
-# =================================================
-# 對外 API：給 app.py 用
-# =================================================
-def load_model(device=None):
-    """
-    給 app.py 使用的模型載入介面
-    """
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return get_model(device)
-
-
 
 @torch.no_grad()
 def predict_food(image_bytes: bytes):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = get_model(device)
+    device = torch.device("cpu")
+    model = load_model(device)
 
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    x = inference_transform(img).unsqueeze(0).to(device)
+    x = inference_transform(img).unsqueeze(0)
 
     logits = model(x)
     prob = torch.softmax(logits, dim=1)
@@ -296,5 +285,4 @@ def predict_food(image_bytes: bytes):
     idx = int(idx.item())
     food_en = IDX_TO_CLASS[idx]
     food_zh = uec_name_to_zh(food_en)
-
     return food_en, food_zh, idx, float(conf.item())

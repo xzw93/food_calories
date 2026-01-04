@@ -172,48 +172,39 @@ def handle_text(event):
 # =================================================
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
-    user_id = event.source.user_id
-
     # 1) 先秒回，避免 LINE timeout
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text="✅ 已收到圖片，辨識中（約數秒）...")
     )
 
-    # 2) 背景 thread 跑推論 & push 結果
-    def worker():
-        try:
-            message_content = line_bot_api.get_message_content(event.message.id)
-            image_bytes = b"".join(message_content.iter_content())
+    try:
+        message_content = line_bot_api.get_message_content(event.message.id)
+        image_bytes = b"".join(message_content.iter_content())
 
-            food_en, food_zh, food_idx, confidence = predict_food(image_bytes)
+        food_en, food_zh, food_idx, confidence = predict_food(image_bytes)
 
-            calorie_text = get_calorie(food_zh)
-            kcal_min, kcal_max = parse_kcal_range(calorie_text)
+        calorie_text = get_calorie(food_zh)
+        kcal_min, kcal_max = parse_kcal_range(calorie_text)
 
-            today = datetime.now().strftime("%Y-%m-%d")
-            user_data = user_records.setdefault(user_id, {})
-            user_data.setdefault(today, []).append({
-                "food": food_zh,
-                "calorie_text": calorie_text,
-                "kcal_min": kcal_min,
-                "kcal_max": kcal_max,
-                "confidence": round(confidence, 3),
-                "source": "model",
-            })
+        reply = (
+            f"🍽 食物判斷：{food_zh}\n"
+            f"🎯 信心分數：{confidence:.3f}\n"
+            f"🔥 熱量估計：{calorie_text}"
+        )
 
-            reply = (
-                f"🍽 食物判斷：{food_zh}\n"
-                f"🎯 信心分數：{confidence:.3f}\n"
-                f"🔥 熱量估計：{calorie_text}"
-            )
-            line_bot_api.push_message(user_id, TextSendMessage(text=reply))
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=reply)
+        )
 
-        except Exception as e:
-            print("❌ 圖片處理錯誤：", e)
-            line_bot_api.push_message(user_id, TextSendMessage(text="❌ 圖片辨識失敗，請再試一次"))
+    except Exception as e:
+        print("❌ 圖片處理錯誤:", e)
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="❌ 圖片辨識失敗，請再試一次")
+        )
 
-    threading.Thread(target=worker, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
