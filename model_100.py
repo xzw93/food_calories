@@ -185,7 +185,7 @@ class BasicBlock(nn.Module):
     def __init__(self, in_ch, out_ch, stride=1):
         super().__init__()
         self.conv1 = conv3x3(in_ch, out_ch, stride)
-        self.bn1 = nn守bn1 = nn.BatchNorm2d(out_ch)
+        self.bn1 = nn.BatchNorm2d(out_ch)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(out_ch, out_ch)
         self.bn2 = nn.BatchNorm2d(out_ch)
