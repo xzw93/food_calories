@@ -35,24 +35,21 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 @app.route("/callback", methods=["POST"])
 def callback():
-    try:
-        signature = request.headers.get("X-Line-Signature")
-        body = request.get_data(as_text=True)
+    signature = request.headers.get("X-Line-Signature")
+    body = request.get_data(as_text=True)
 
-        # ✅ LINE Verify Webhook（沒有 signature）
-        if not signature:
-            print("LINE Verify webhook received")
-            return "OK", 200
-
-        # ✅ 正常事件處理
-        handler.handle(body, signature)
-
-    except Exception as e:
-        # ❗❗❗ 任何錯誤都不能回 400
-        print("Webhook error (ignored for verify):", repr(e))
+    # 👉 LINE Verify / 健康檢查
+    if not signature:
         return "OK", 200
 
+    # 👉 先立刻回 200（超重要）
+    try:
+        handler.handle(body, signature)
+    except Exception as e:
+        print("Handler error:", e)
+
     return "OK", 200
+
 
 def parse_kcal_range(text: str) -> int | None:
     """
