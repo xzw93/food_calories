@@ -1,0 +1,10 @@
+flask
+gunicorn
+line-bot-sdk
+torch
+torchvision
+pillow
+numpy
+pandas
+openpyxl
+scikit-learn
