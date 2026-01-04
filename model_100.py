@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import io
 from pathlib import Path
 from typing import Tuple, Optional
@@ -10,7 +9,7 @@ from PIL import Image
 
 
 # =================================================
-# 1. UECFOOD 100 類（模型輸出類別，順序不可變）
+# 1. UECFOOD 100 類
 # =================================================
 UEC100_CLASSES = [
     "miso_soup","rice","ramen_noodle","green_salad","beef_curry","omelet",
@@ -177,26 +176,24 @@ def uec_name_to_zh(name: str) -> str:
 
 
 # =================================================
-# 3. 自建 ResNet-like（不使用 torchvision/resnet18，不載入預訓練）
-#    - 殘差結構是你自己實作 => 符合「自建模型」
+# 3. 自建 ResNet-like
 # =================================================
 def conv3x3(in_ch, out_ch, stride=1):
-    return nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=stride, padding=1, bias=False)
+    return nn.Conv2d(in_ch, out_ch, 3, stride, 1, bias=False)
 
 class BasicBlock(nn.Module):
-    expansion = 1
     def __init__(self, in_ch, out_ch, stride=1):
         super().__init__()
         self.conv1 = conv3x3(in_ch, out_ch, stride)
-        self.bn1 = nn.BatchNorm2d(out_ch)
+        self.bn1 = nn守bn1 = nn.BatchNorm2d(out_ch)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(out_ch, out_ch, 1)
+        self.conv2 = conv3x3(out_ch, out_ch)
         self.bn2 = nn.BatchNorm2d(out_ch)
 
         self.downsample = None
         if stride != 1 or in_ch != out_ch:
             self.downsample = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(in_ch, out_ch, 1, stride, bias=False),
                 nn.BatchNorm2d(out_ch),
             )
 
@@ -204,50 +201,32 @@ class BasicBlock(nn.Module):
         identity = x
         out = self.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
-        if self.downsample is not None:
+        if self.downsample:
             identity = self.downsample(identity)
-        out = self.relu(out + identity)
-        return out
+        return self.relu(out + identity)
 
 class FoodCNN(nn.Module):
-    """
-    自建 ResNet18-like: [2,2,2,2] blocks
-    """
-    def __init__(self, num_classes: int = NUM_CLASSES, dropout: float = 0.2):
+    def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
         self.stem = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.Conv2d(3, 64, 7, 2, 3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            nn.MaxPool2d(3, 2, 1),
         )
-
         self.in_ch = 64
-        self.layer1 = self._make_layer(64,  blocks=2, stride=1)
-        self.layer2 = self._make_layer(128, blocks=2, stride=2)
-        self.layer3 = self._make_layer(256, blocks=2, stride=2)
-        self.layer4 = self._make_layer(512, blocks=2, stride=2)
-
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.head = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(512, num_classes),
-        )
-
-        # 初始化（讓 from-scratch 好訓練一點）
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1.0)
-                nn.init.constant_(m.bias, 0.0)
+        self.layer1 = self._make_layer(64, 2, 1)
+        self.layer2 = self._make_layer(128, 2, 2)
+        self.layer3 = self._make_layer(256, 2, 2)
+        self.layer4 = self._make_layer(512, 2, 2)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Linear(512, num_classes)
 
     def _make_layer(self, out_ch, blocks, stride):
-        layers = []
-        layers.append(BasicBlock(self.in_ch, out_ch, stride=stride))
+        layers = [BasicBlock(self.in_ch, out_ch, stride)]
         self.in_ch = out_ch
         for _ in range(1, blocks):
-            layers.append(BasicBlock(self.in_ch, out_ch, stride=1))
+            layers.append(BasicBlock(out_ch, out_ch))
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -256,42 +235,43 @@ class FoodCNN(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.pool(x)
-        x = torch.flatten(x, 1)
-        x = self.head(x)
-        return x
+        x = self.pool(x).flatten(1)
+        return self.fc(x)
 
 
 # =================================================
-# 4. 推論前處理（維持你的原設定）
+# 4. 推論前處理
 # =================================================
 inference_transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225]),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
 ])
 
 
-def load_model(weight_path=None, device=None):
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FoodCNN().to(device).eval()
+# =================================================
+# 5. 🔥 Lazy-load 模型（重點）
+# =================================================
+_MODEL = None
 
-    if weight_path is None:
+def get_model(device):
+    global _MODEL
+    if _MODEL is None:
         weight_path = Path(__file__).parent / "outputs_100" / "uec100_model.pth"
-
-    model.load_state_dict(torch.load(weight_path, map_location=device))
-    return model
+        model = FoodCNN().to(device)
+        model.load_state_dict(torch.load(weight_path, map_location=device))
+        model.eval()
+        _MODEL = model
+    return _MODEL
 
 
 @torch.no_grad()
-def predict_food(
-    image_bytes: bytes,
-    model: Optional[FoodCNN] = None,
-    device=None
-) -> Tuple[str, str, int, float]:
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model or load_model(device=device)
+def predict_food(image_bytes: bytes) -> Tuple[str, str, int, float]:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = get_model(device)
 
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     x = inference_transform(img).unsqueeze(0).to(device)
